@@ -13,20 +13,91 @@ echo "###"
 echo "#############################################################################################"
 echo
 echo
+
+# ====================
+# Need to run as root
+# ====================
+if ![ $(id -u) = 0 ];
+then 
+	echo "Please run as root"
+	exit
+else
+	TEXT_RESET='\e[0m'
+	TEXT_YELLOW='\e[0;33m'
+	TEXT_RED_B='\e[1;31m'
+fi
+
+#
+# ==================
+# Helper Functions
+# ==================
+#
+# Echo out in YELLOW
+echo_yellow()
+{
+	echo -n -e $TEXT_YELLOW
+	echo $1
+	echo -e $TEXT_RESET
+}
+# Echo out in RED
+echo_red()
+{
+	echo -n -e $TEXT_RED
+	echo $1
+	echo -e $TEXT_RESET
+}
+# Install package if not installed (NOT NEEDED BUT PUT IN GITHUB)
+install()
+{
+	echo_yellow "Installing $1 ..."
+	# Test if no data passed
+	if [ -z $1 ];
+	then
+		echo_red "No Package specified"
+	else
+		dpkg -s $1 &> /dev/null
+		if [ $? -eq 0 ]; 
+		then
+			echo_yellow "Package $1 already installed!"
+		else
+			sudo apt install $1 -y
+		fi
+	fi
+}
+# Add a packate to an Image
+add_to_image()
+{
+	echo_yellow "Add Package $2 to image $1 ..."
+	if [ -z $1 ];
+	then
+		echo_red "No Package specified"
+	elif [ -z $2 ];
+	then
+		echo_red "No Package specified"
+	else
+		# Example
+		# sudo virt-customize -a focal-server-cloudimg-amd64.img --install sudo	
+		sudo virt-customize -a $1 --install $2		
+	fi
+}
+
+# =========================================================
 # Going to ask questions for VM number, hostname, vlan tag
-echo
+# =========================================================
 while true; do
-   read -r -p "Enter desired hostname for the Virutal Machine: " NEWHOSTNAME
+   echo_yellow "Enter desired hostname for the Virutal Machine: "
+   read -r NEWHOSTNAME
    if [[ ! $NEWHOSTNAME == *['!'@#\$%^\&*()\_+\']* ]];then
       break;
    else
-      echo "Contains a character not allowed for a hostname, please try again"
+      echo_red "Contains a character not allowed for a hostname, please try again"
    fi
 done
 echo
-echo "*** Taking a 5-7 seconds to gather information ***"
+echo_yellow "*** Taking a 5-7 seconds to gather information ***"
 echo
-#Picking VM ID number
+# Picking VM ID number
+# ====================
 vmidnext=$(pvesh get /cluster/nextid)
 declare -a vmidsavail=$(pvesh get /cluster/resources | awk '{print $2}' | sed '/storage/d' | sed '/node/d' | sed '/id/d' | sed '/./,/^$/!d' | cut -d '/' -f 2 | sed '/^$/d')
 
@@ -41,7 +112,8 @@ USEDIDS=("${vmidsavail[@]}" "${systemids[@]}")
 declare -a all=( echo ${USEDIDS[@]} )
 
 function get_vmidnumber() {
-    read -p "${1} New VM ID number: " number
+    echo_yellow "${1} New VM ID number: "
+    read number
     if [[ " ${all[*]} " != *" ${number} "* ]]
     then
         VMID=${number:-$vmidnext}
@@ -49,23 +121,22 @@ function get_vmidnumber() {
         get_vmidnumber 'Enter a different number because either you are using it or reserved by the sysem'
     fi
 }
-echo "Enter desired VM ID number or press enter to accept default of $vmidnext: "
+echo_yellow "Enter desired VM ID number or press enter to accept default of $vmidnext: "
 get_vmidnumber ''
 
-echo "The VM number will be $VMID"
+echo_yellow "The VM number will be $VMID"
 
-echo
-read -p "Enter desired VM username: " USER
-echo
+## Get User Name and Password
+# ===========================
+echo_yellow "Enter desired VM username: "
+read USER
 while true; do
-    read -s -p "Please enter password for the user: " PASSWORD
-    echo
-    read -s -p "Please repeat password for the user: " PASSWORD1
-    echo
+    echo_yellow "Please enter password for the user: "
+    read -s PASSWORD
+    echo_yellow "Please repeat password for the user: "
+    read -s PASSWORD1
     [ "$PASSWORD" = "$PASSWORD1" ] && break
-    echo
-    echo "Please try again passwords did not match"
-    echo
+    echo_red "Please try again passwords did not match"
 done
 echo
 # really just hashing the password so its not in plain text in the usercloud.yaml
@@ -74,7 +145,8 @@ echo
 kindofsecure=$(openssl passwd -1 -salt SaltSalt $PASSWORD)
 
 ## Selecting the Storage th VM will run on
-echo "Please select the storage the VM will run on?"
+# =========================================
+echo_yellow "Please select the storage the VM will run on?"
 storageavail=$(awk '{if(/:/) print $2}' /etc/pve/storage.cfg)
 typestorage=$(echo "${storageavail[@]}")
 declare -a allstorage=( ${typestorage[@]} )
@@ -87,17 +159,16 @@ then
         vmstorage=$option
         break;
 else
-        echo "Incorrect Input: Select a number 1-$total_num_storage"
+        echo_red "Incorrect Input: Select a number 1-$total_num_storage"
 fi
 done
 
-echo
-echo "The storage you selected for the VM is $vmstorage"
+echo_yellow "The storage you selected for the VM is $vmstorage"
 
 ## Selecting the ISO Storage location
-
+# ====================================
 echo
-echo "Please select ISO storage location"
+echo_yellow "Please select ISO storage location"
 isostorageavail=$(awk '{if(/path/) print $2}' /etc/pve/storage.cfg)
 path=/template/iso/
 typeisostorage=$(echo "${isostorageavail[@]}")
@@ -113,26 +184,27 @@ allisostorage2=$( echo ${allisostorage[@]} )
 select option in $allisostorage2; do
 if [ 1 -le "$REPLY" ] && [ "$REPLY" -le $total_num_storage_paths ];
 then
-#        echo "The selected option is $REPLY"
-#        echo "The selected storage is $option"
+        echo_yellow "The selected option is $REPLY"
+        echo_yellow "The selected storage is $option"
         isostorage=$option
         break;
 else
-        echo "Incorrect Input: Select a number 1-$total_num_storage_paths"
+        echo_red "Incorrect Input: Select a number 1-$total_num_storage_paths"
 fi
 done
 
-echo
-echo "The cloud image will be downloaded to " $isostorage " or look there if already downloaded"
+
+echo_yellow "The cloud image will be downloaded to " $isostorage " or look there if already downloaded"
 echo
 
-# user.yaml config location and storage for snippets
-echo "Please select the storage that has snippets available"
-echo "If you pick one that does not have it enabled the VM being created will not have all the"
-echo "user settings (user name, password , keys) so if you need to check in the GUI click on Datacenter"
-echo "then click on storage and see if enabled, if not you need to enable it on the storage you want it"
-echo "to be placed on.  There will be two questions for snippet setup. One for the actual locaiton to put the user.yaml and the"
-echo "second for the storage being used for snippets."
+## user.yaml config location and storage for snippets
+# ===================================================
+echo_yellow "Please select the storage that has snippets available"
+echo_yellow "If you pick one that does not have it enabled the VM being created will not have all the"
+echo_yellow "user settings (user name, password , keys) so if you need to check in the GUI click on Datacenter"
+echo_yellow "then click on storage and see if enabled, if not you need to enable it on the storage you want it"
+echo_yellow "to be placed on.  There will be two questions for snippet setup. One for the actual locaiton to put the user.yaml and the"
+echo_yellow "second for the storage being used for snippets."
 echo
 snippetsstorageavail=$(awk '{if(/path/) print $2}' /etc/pve/storage.cfg)
 snippetspath=/snippets/
@@ -153,18 +225,18 @@ then
         snippetstorage=$option
         break;
 else
-        echo "Incorrect Input: Select a number 1-$total_num_snippet_paths"
+        echo_red "Incorrect Input: Select a number 1-$total_num_snippet_paths"
 fi
 done
 
 echo
-echo "The snippet storage location will be " $snippetstorage "here, which will hold the user data yaml file for each VM"
+echo_yellow "The snippet storage location will be " $snippetstorage "here, which will hold the user data yaml file for each VM"
 echo
-echo "Now that we have selected the snippet storage path ($snippetstorage) we need to actually select the storage that this path is on."
-echo "Make sure the path picked and the storage picked are one in the same or it will fail."
-echo "example /var/lib/vz/snippets/ is "local" storage"
+echo_yellow "Now that we have selected the snippet storage path ($snippetstorage) we need to actually select the storage that this path is on."
+echo_yellow "Make sure the path picked and the storage picked are one in the same or it will fail."
+echo_yellow "example /var/lib/vz/snippets/ is "local" storage"
 echo
-echo "Please select the storage the snippets will be on"
+echo_yellow "Please select the storage the snippets will be on"
 storageavailsnip=$(awk '{if(/:/) print $2}' /etc/pve/storage.cfg)
 typestoragesnip=$(echo "${storageavailsnip[@]}")
 declare -a allstoragesnip=( ${typestoragesnip[@]} )
@@ -181,14 +253,13 @@ else
 fi
 done
 
-echo
-echo "The snippet storage path of the user.yaml file will be" $snippetstorage
-echo "The storage for snippets being used is" $snipstorage
+echo_yellow "The snippet storage path of the user.yaml file will be" $snippetstorage
+echo_yellow "The storage for snippets being used is" $snipstorage
 echo
 
-#Checking to see what VMBR interface you want to use
-echo
-echo "Please select VMBR to use for your network"
+## Checking to see what VMBR interface you want to use
+# ===================================================
+echo_yellow "Please select VMBR to use for your network"
 declare -a vmbrs=$(awk '{if(/vmbr/) print $2}' /etc/network/interfaces)
 declare -a vmbrsavail=( $(printf "%s\n" "${vmbrs[@]}" | sort -u) )
 
@@ -207,311 +278,321 @@ then
         vmbrused=$option
         break;
 else
-        echo "Incorrect Input: Select a number 1-$total_num_vmbrs"
+        echo_red "Incorrect Input: Select a number 1-$total_num_vmbrs"
 fi
 done
 
-echo "Your network bridge will be on " $vmbrused
-echo
+echo_yellow "Your network bridge will be on " $vmbrused
 echo
 
-#VLAN information block
+## VLAN information block
+# ========================
 while true
 do
- read -r -p "Do you need to enter a VLAN number? [Y/n] " VLANYESORNO
+    echo_yellow "Do you need to enter a VLAN number? [Y/n] "
+    read -r VLANYESORNO
 
- case $VLANYESORNO in
-     [yY][eE][sS]|[yY])
- echo
- while true
- do
-  read -p "Enter desired VLAN number for the VM: " VLAN
-  if [[ $VLAN -ge 0 ]] && [[ $VLAN -le 4096 ]]
-  then
-     break
-  fi
- done
- echo
- break
- ;;
-     [nN][oO]|[nN])
- echo
- break
-        ;;
-     *)
- echo "Invalid input, please enter Y/N or yes/no"
- ;;
- esac
+    case $VLANYESORNO in
+        [yY][eE][sS]|[yY])
+            echo
+            while true
+            do
+                echo_yellow "Enter desired VLAN number for the VM: "
+                read VLAN
+                if [[ $VLAN -ge 0 ]] && [[ $VLAN -le 4096 ]]
+                then
+                    break
+                fi
+            done
+            break
+            ;;
+        [nN][oO]|[nN])
+            break
+            ;;
+        *)
+            echo_red "Invalid input, please enter Y/N or yes/no"
+            ;;
+    esac
 done
 
-# Setting DCHP or a Static IP
+## Setting DCHP or a Static IP
+# ============================
 echo
 while true
 do
- read -p "Enter Yes/Y to use DHCP for IP or Enter No/N to set a static IP address: " DHCPYESORNO
+    echo_yellow "Enter Yes/Y to use DHCP for IP or Enter No/N to set a static IP address: "
+    read DHCPYESORNO
 
- case $DHCPYESORNO in
-     [yY][eE][sS]|[yY])
- break
- ;;
-     [nN][oO]|[nN])
-    while true; do
-        echo
-        read -p "Enter IP address to use (format example 192.168.1.50/24): " IPADDRESS
-        echo
-        read -p "Please repeat IP address to use (format example 192.168.1.50/24): " IPADDRESS2
-        echo
-        [ "$IPADDRESS" = "$IPADDRESS2" ] && break
-        echo
-        echo "Please try again IP addresses did not match"
-        echo
-    done
-    while true; do
-        read -p "Enter gateway IP address to use (format example 192.168.1.1): " GATEWAY
-        echo
-        read -p "Please repeate gateway IP address to use (format example 192.168.1.1): " GATEWAY2
-        echo
-        [ "$GATEWAY" = "$GATEWAY2" ] && break
-        echo
-        echo "Please try again gateway IP addresses did not match"
-        echo
-    done
-    echo
- break
+    case $DHCPYESORNO in
+        [yY][eE][sS]|[yY])
+            break
         ;;
-     *)
- echo "Invalid input, please enter Y/n or yes/no"
- ;;
- esac
+        [nN][oO]|[nN])
+            while true; do
+                echo_yellow "Enter IP address to use (format example 192.168.1.50/24): "
+                read IPADDRESS
+                echo_yellow "Please repeat IP address to use (format example 192.168.1.50/24): "
+                read IPADDRESS2
+                echo
+                [ "$IPADDRESS" = "$IPADDRESS2" ] && break
+                echo_red "Please try again IP addresses did not match"
+            done
+            while true; do
+                echo_yellow "Enter gateway IP address to use (format example 192.168.1.1): "
+                read GATEWAY
+                echo_yellow "Please repeate gateway IP address to use (format example 192.168.1.1): "
+                read GATEWAY2
+                [ "$GATEWAY" = "$GATEWAY2" ] && break
+                echo_red "Please try again gateway IP addresses did not match"
+            done
+            break
+        ;;
+        *)
+            echo_red "Invalid input, please enter Y/n or yes/no"
+        ;;
+    esac
 done
-echo
 
-
+# ====================================================================================================================
 ## This next section is asking if you need to resize the root disk so its jsut not the base size from the cloud image
+# ====================================================================================================================
 while true
 do
- read -r -p "Would you like to resize the base cloud image disk (Enter Y/N?) " RESIZEDISK
+    echo_yellow "Would you like to resize the base cloud image disk (Enter Y/N?) "
+    read -r RESIZEDISK
 
- case $RESIZEDISK in
-     [yY][eE][sS]|[yY])
- echo
- echo "Please enter in GB's (exampe 2 for adding 2GB to the resize) how much space you want to add: "
- echo
- read -p "Enter size in Gb's: " ADDDISKSIZE
- break
- ;;
-     [nN][oO]|[nN])
- RESIZEDISK=n
- break
+    case $RESIZEDISK in
+        [yY][eE][sS]|[yY])
+            echo_yellow "Please enter in GB's (exampe 2 for adding 2GB to the resize) how much space you want to add: "
+            echo_yellow "Enter size in Gb's: "
+            read ADDDISKSIZE
+            break
         ;;
-     *)
- echo "Invalid input, please enter Y/n or yes/no"
- ;;
- esac
+        [nN][oO]|[nN])
+            RESIZEDISK=n
+            break
+        ;;
+        *)
+            echo_red "Invalid input, please enter Y/n or yes/no"
+        ;;
+    esac
 done
-echo
 
+# =================================================================================
 # Asking if they want to change core ram and stuff other then some defaults I set
 # Default cores is 4 and memory is 2048
+# =================================================================================
 while true
 do
- echo "The default CPU cores is set to 4 and default memory (ram) is set to 2048"
- read -r -p "Would you like to change the cores or memory (Enter Y/n)? " corememyesno
+    echo_yellow "The default CPU cores is set to 2 and default memory (ram) is set to 2048"
+    echo_yellow "Would you like to change the cores or memory (Enter Y/n)? "
+    read -r corememyesno
 
- case $corememyesno in
-     [yY][eE][sS]|[yY])
- echo
- read -p "Enter number of cores for VM $VMID: " CORES
- echo
- read -p "Enter how much memory for the VM $VMID (example 2048 is 2Gb of memory): " MEMORY
- break
- ;;
-     [nN][oO]|[nN])
- CORES="4"
- MEMORY="2048"
- break
+    case $corememyesno in
+        [yY][eE][sS]|[yY])
+            echo_yellow "Enter number of cores for VM $VMID: "
+            read CORES
+            echo_yellow "Enter how much memory for the VM $VMID (example 2048 is 2Gb of memory): "
+            read MEMORY
+            break
         ;;
-     *)
- echo "Invalid input, please enter Y/n or Yes/no"
- ;;
- esac
+        [nN][oO]|[nN])
+            CORES="2"
+            MEMORY="2048"
+            break
+        ;;
+        *)
+            echo_red "Invalid input, please enter Y/n or Yes/no"
+        ;;
+    esac
 done
-echo
 
+# =========================================================================
 # This block is see if they want to add a key to the VM
 # and then it checks the path to it and checks to make sure it exists
-echo
+# =========================================================================
 while true
 do
- read -r -p "Do you want to add a ssh key by entering the path to the key? (Enter Y/n) " sshyesno
+    echo_yellow "Do you want to add a ssh key by entering the path to the key? (Enter Y/n) "
+    read -r sshyesno
 
- case $sshyesno in
-     [yY][eE][sS]|[yY])
- while true; do
- echo
- read -p "Enter the path and key name (path/to/key.pub): " path_to_ssh_key
- echo
- [ -f "$path_to_ssh_key" ] && echo "It appears to be a good key path." && SSHAUTHKEYS=$(cat "$path_to_ssh_key") && break || echo && echo "Does not exist, try again please."
- done
- break
- ;;
-     [nN][oO]|[nN])
- break
+    case $sshyesno in
+        [yY][eE][sS]|[yY])
+            while true; do
+                echo_yellow "Enter the path and key name (path/to/key.pub): "
+                read path_to_ssh_key
+                echo
+                [ -f "$path_to_ssh_key" ] && echo_yellow "It appears to be a good key path." && SSHAUTHKEYS=$(cat "$path_to_ssh_key") && break || echo_red "Does not exist, try again please."
+            done
+            break
         ;;
-     *)
- echo "Invalid input, please enter Y/N or yes/no"
- ;;
- esac
+        [nN][oO]|[nN])
+            break
+        ;;
+        *)
+            echo_red "Invalid input, please enter Y/N or yes/no"
+        ;;
+    esac
 done
-echo
 
+# ==============================================================
 # Setting if user can use a password to ssh or just keys
 # default is set to keys only so must say yes for password ssh
+# ==============================================================
 while true
 do
- read -r -p "Do you want ssh password authentication (Enter Y/n)? " sshpassyesorno
+    echo_yellow "Do you want ssh password authentication (Enter Y/n)? "
+    read -r sshpassyesorno
 
- case $sshpassyesorno in
-     [yY][eE][sS]|[yY])
- echo
- sshpassallow=True
- break
- ;;
-     [nN][oO]|[nN])
- sshpassallow=False
- echo
- break
+    case $sshpassyesorno in
+        [yY][eE][sS]|[yY])
+            sshpassallow=True
+            break
         ;;
-     *)
- echo "Invalid input, please enter Y/N or yes/no"
- ;;
- esac
+        [nN][oO]|[nN])
+            sshpassallow=False
+            break
+        ;;
+        *)
+            echo_red "Invalid input, please enter Y/N or yes/no"
+        ;;
+    esac
 done
 echo
 
+# ==================================================================
 # GOING TO SETUP OTHER PACKAGE INSTALL OPTIONS ON FIRST RUN
 # EXAMPLE WOULD BE 
 # qm set VMID --agent 1
 # qemu-guest-agent
+# ==================================================================
 while true
 do
- read -r -p "Would you like to install qemu-gust-agent on first run? (Enter Y/n) " qemuyesno
+    echo_yellow "Would you like to install qemu-gust-agent on first run? (Enter Y/n) " 
+    read -r qemuyesno
 
- case $qemuyesno in
-     [yY][eE][sS]|[yY])
- QEMUGUESTAGENT=y
- break
- ;;
-     [nN][oO]|[nN])
- QEMUGUESTAGENT=n
- break
+    case $qemuyesno in
+        [yY][eE][sS]|[yY])
+            QEMUGUESTAGENT=y
+            break
         ;;
-     *)
- echo "Invalid input, please enter Y/n or yes/no"
- ;;
- esac
+        [nN][oO]|[nN])
+            QEMUGUESTAGENT=n
+            break
+        ;;
+        *)
+            echo_red "Invalid input, please enter Y/n or yes/no"
+        ;;
+    esac
 done
 
-echo
+# ================================
+# Autostart at boot question
+# ================================
 while true
 do
- read -r -p "Do you want the VM to autostart after you create it here? (Enter Y/n)? " AUTOSTARTS
+    echo_yellow "Do you want the VM to autostart after you create it here? (Enter Y/n)? "
+    read -r AUTOSTARTS
 
- case $AUTOSTARTS in
-     [yY][eE][sS]|[yY])
- echo
- AUTOSTART=yes
- break
- ;;
-     [nN][oO]|[nN])
- AUTOSTART=no
- echo
- break
+    case $AUTOSTARTS in
+        [yY][eE][sS]|[yY])
+            AUTOSTART=yes
+            break
         ;;
-     *)
- echo "Invalid input, please enter Y/N or yes/no"
- ;;
- esac
+        [nN][oO]|[nN])
+            AUTOSTART=no
+            break
+        ;;
+        *)
+            echo_red "Invalid input, please enter Y/N or yes/no"
+        ;;
+    esac
 done
-echo
+
+
 # This block of code is for picking which node to have the VM on.
 # Couple things it creates the VM on the current node, then migrate's
 # to the node you selected, so must have shared storage (at least for
 # what I have tested or storages that are the same).  I run
 # ceph on my cluster, so its easy to migrate them.
 echo
-echo "   PLEASE READ - THIS IS FOR PROXMOX CLUSTERS "
-echo "   This will allow you to pick the Proxmox node for the VM to be on once it is completed "
-echo "   BUT "
-echo "   It will start on the proxmox node you are on and then it will use "
-echo "   qm migrate to the target node (JUST FYI) "
+echo_yellow "   PLEASE READ - THIS IS FOR PROXMOX CLUSTERS "
+echo_yellow "   This will allow you to pick the Proxmox node for the VM to be on once it is completed "
+echo_yellow "   BUT "
+echo_yellow "   It will start on the proxmox node you are on and then it will use "
+echo_yellow "   qm migrate to the target node (JUST FYI) "
 echo
-
 
 if [ -f "/etc/pve/corosync.conf" ];
 then
-localnode=$(cat '/etc/hostname')
-while true
-do
- read -p "Enter Yes/y to pick the node to install the virtual machine onto OR enter No/n to use current node of $localnode : " NODESYESNO
+    localnode=$(cat '/etc/hostname')
+    while true
+    do
+        echo_yellow "Enter Yes/y to pick the node to install the virtual machine onto OR enter No/n to use current node of $localnode : "
+        read NODESYESNO
 
- case $NODESYESNO in
-     [yY][eE][sS]|[yY])
- echo "Please select the NODE to migrate the Virtual Machine to after creation (current node $localnode)"
- nodesavailable=$(pvecm nodes | awk '{print $3}' | sed '/Name/d')
- nodesavailabe2=$(echo "${nodesavailable[@]}")
- declare -a NODESELECTION=( ${nodesavailabe2[@]} )
- total_num_nodes=${#NODESELECTION[@]}
- echo $total_num_nodes
+        case $NODESYESNO in
+            [yY][eE][sS]|[yY])
+                echo_yellow "Please select the NODE to migrate the Virtual Machine to after creation (current node $localnode)"
+                nodesavailable=$(pvecm nodes | awk '{print $3}' | sed '/Name/d')
+                nodesavailabe2=$(echo "${nodesavailable[@]}")
+                declare -a NODESELECTION=( ${nodesavailabe2[@]} )
+                total_num_nodes=${#NODESELECTION[@]}
+                echo_yellow $total_num_nodes
 
- select option in $nodesavailabe2; do
- if [ 1 -le "$REPLY" ] && [ "$REPLY" -le $total_num_nodes ];
- then
-         migratenode=$option
-         break;
- else
-         echo "Incorrect Input: Select a number 1-$total_num_nodes"
- fi
- done
+                select option in $nodesavailabe2; do
+                    if [ 1 -le "$REPLY" ] && [ "$REPLY" -le $total_num_nodes ];
+                    then
+                        migratenode=$option
+                        break;
+                    else
+                        echo_red "Incorrect Input: Select a number 1-$total_num_nodes"
+                    fi
+                done
 
- echo
- echo "The Virtual Machine $VMID with be on $migratenode after it is created and moved"
- echo
- NODESYESNO=y
- break
- ;;
-     [nN][oO]|[nN])
- NODESYESNO=n
- break
-        ;;
-     *)
- echo "Invalid input, please enter Y/n or yes/no"
- ;;
- esac
-done
+                echo_yellow "The Virtual Machine $VMID with be on $migratenode after it is created and moved"
+                NODESYESNO=y
+                break
+            ;;
+            [nN][oO]|[nN])
+                NODESYESNO=n
+                break
+            ;;
+            *)
+                echo_red "Invalid input, please enter Y/n or yes/no"
+            ;;
+        esac
+    done
 else
- NODESYESNO=n
+    NODESYESNO=n
 fi
-echo
+
+# ==========================
+# VM Protection: $PROTECTVM
+# ==========================
 while true
 do
- read -r -p "Do you want VM protection enabled[Y/n]: " PROTECTVM
+    echo_yellow "Do you want VM protection enabled[Y/n]: "
+    read -r PROTECTVM
 
- case $PROTECTVM in
-     [yY][eE][sS]|[yY])
- break
- ;;
-     [nN][oO]|[nN])
- break
+    case $PROTECTVM in
+        [yY][eE][sS]|[yY])
+            break
         ;;
-     *)
- echo "INVALID INPUT, PLEASE ENTER [Y/n]"
- ;;
- esac
+        [nN][oO]|[nN])
+            break
+        ;;
+        *)
+            echo_red "INVALID INPUT, PLEASE ENTER [Y/n]"
+        ;;
+    esac
 done
+
+# ==============
+# Select the VM
+# ==============
 echo
-echo
-echo "Please select the cloud image you would like to use"
+echo_yellow "Please select the cloud image you would like to use"
 PS3='Select an option and press Enter: '
 options=("Ubuntu Groovy 20.10 Cloud Image" "Ubuntu Focal 20.04 Cloud Image" "Ubuntu Minimal Focal 20.04 Cloud Image" "CentOS 7 Cloud Image" "Debian 10 Cloud Image" "Debian 9 Cloud Image" "Ubuntu 18.04 Bionic Image" "CentOS 8 Cloud Image" "Fedora 32 Cloud Image" "Rancher OS Cloud Image")
 select osopt in "${options[@]}"
@@ -550,8 +631,7 @@ do
         *) echo "invalid option";;
   esac
 done
-echo
-echo "You have selected Cloud Image $osopt"
+echo_yellow "You have selected Cloud Image $osopt"
 echo
 
 # setting the Cloud Image for later for qm info
@@ -585,7 +665,10 @@ then
 else [ "$osopt" == "Rancher OS Cloud Image" ];
    cloudos=$isostorage'rancheros-openstack.img'
 fi
-echo
+
+# =================
+# Add to YAML file
+# =================
 
 # just in case you are reusing ID's - which most do so...
 # next line removes any existing one for this vmid we are setting up
