@@ -1,5 +1,7 @@
 README
 
+**NOTE:** This is forked from [https://github.com/francismunch/vmbuilder](https://github.com/francismunch/vmbuilder) excellent script, modified as required
+
 Proxmox Virtual Machine Builder with Cloud Images
 
 You can have a virtual machine created and booted with the information you set within two minutes. Auto downloads the cloud image if you need it and once all the information is set it auto starts it for you.
