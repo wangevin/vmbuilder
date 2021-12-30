@@ -716,10 +716,6 @@ display-var migratenode
 echo ""
 echo ""
 echo "Building the VM"
-exit
-
-
-
 
 
 # create a new VM
