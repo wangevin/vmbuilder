@@ -1,4 +1,5 @@
 #!/bin/bash
+#set -x -v -o -e
 clear
 echo "#############################################################################################"
 echo "###"
@@ -32,6 +33,8 @@ fi
 # Helper Functions
 # ==================
 #
+
+# If  NOECHO="y" then will not echo input, ala password. Defaults to echo.
 ask()
 {
 	if [ $# -eq 0 ]; then
@@ -40,18 +43,26 @@ ask()
 		echo -e "\e[1;31mInvalid number of arguments supplied, Format: ask <variable> <prompt>\e[0m"
 	fi
 
-	VAR=$1
-	PROMPT=$2
-
 	while true ; do
-		echo -n "$PROMPT "
-    	read -r $VAR
-        if [ -z "$VAR" ]; then
+		echo -n "$2 "
+
+        if [ "$NOECHO" = "y" ];
+        then
+            read -r -s INPUT
+            echo ""
+        else
+            read -r INPUT
+        fi
+
+        if [ -z "$INPUT" ]; then
                 echo -e "\e[1;31mNo input provided\e[0m"
 		else
 			break
         fi
 	done
+
+    declare -n VAR_PTR=$1
+	VAR_PTR="$INPUT"
 }
 
 ask-number()
@@ -59,7 +70,7 @@ ask-number()
 	while true; do
 		ask $1 "$2"
 		if ! [[ "${!1}" =~ ^[+-]?[0-9]+\.?[0-9]*$ ]]; then
-			echo -e "\e[1;31mInput must be a numbers\e[0m"
+			echo -e "\e[1;31mInput must be a number\e[0m"
 		else
 			break
 		fi
@@ -69,7 +80,7 @@ ask-number()
 ask-yes-no()
 {
 	while true; do
-		ask ANSWER "$2"
+		ask ANSWER "$2 [Y/n]"
 		case "$ANSWER" in
         	[yY][eE][sS]|[yY])
 				RESPONSE="y"
@@ -92,7 +103,7 @@ ask-verify()
 {
 	while true; do
 		ask FIRST_TIME "$2"
-		ask SECOND_TIME "Verify: $2"
+		ask SECOND_TIME "$2 (Repeat to Verify)"
 		if [ "$FIRST_TIME" = "$SECOND_TIME" ]; then
 			declare -n VAR_PTR=$1
 			VAR_PTR="$FIRST_TIME"
@@ -101,7 +112,43 @@ ask-verify()
 			echo -e "\e[1;31mPlease try again as inputs did not match\e[0m"
 		fi
 	done
+    NOECHO=""
 }
+
+ask-verify-noecho()
+{
+    NOECHO="y"
+
+    ask-verify RESPONSE "$2"
+
+    declare -n VAR_PTR=$1
+	VAR_PTR="$RESPONSE"
+
+    NOECHO=""
+}
+
+ask-boolean()
+{
+	while true; do
+		ask ANSWER "$2 [T/F]"
+		case "$ANSWER" in
+        	[tT][rR][uU]|[eE])
+				RESPONSE=True
+				break
+				;;
+			[fF][aA]|[lL][sS][eE])
+				RESPONSE=False
+            	break
+        		;;
+        	*)
+            	echo -e "\e[1;31mInvalid input, please enter T/F or true/false\e[0m"
+            	;;
+    	esac
+	done
+	declare -n VAR_PTR=$1
+	VAR_PTR="$RESPONSE"
+}
+
 # Install package if not installed (NOT NEEDED BUT PUT IN GITHUB)
 install()
 {
@@ -133,43 +180,34 @@ add_to_image()
 	else
 		# Example
 		# sudo virt-customize -a focal-server-cloudimg-amd64.img --install sudo	
-		sudo virt-customize -a $1 --install $2		
+		sudo virt-customize -a $1 --install $2
 	fi
 }
-
-while true; do
-    ask NEWHOSTNAME "Enter desired hostname for the Virutal Machine:"
-    if [[ ! $NEWHOSTNAME == *['!'@#\$%^\&*()\_+\']* ]];then
-      break;
-   else
-      echo -e "Contains a character not allowed for a hostname, please try again"
-   fi
-done
 
 
 # =========================================================
 # Get NEWHOSTNAME
 # =========================================================
 while true; do
-   echo "Enter desired hostname for the Virutal Machine: "
-   read -r NEWHOSTNAME
-   if [[ ! $NEWHOSTNAME == *['!'@#\$%^\&*()\_+\']* ]];then
+    ask NEWHOSTNAME "Enter desired hostname for the Virutal Machine:"
+    if [[ ! $NEWHOSTNAME == *['!'@#\$%^\&*()\_+\']* ]];then
       break;
    else
-      echo -e "$TEXT_REDContains a character not allowed for a hostname, please try again$TEXT_RESET"
+      echo -e "\e[1;31mContains a character not allowed for a hostname, please try again\e[0m"
    fi
 done
+echo ""
 
 
 # =========================================================
-# Get VMID
+# Get List of Exixting VMID's for Verification
 # =========================================================
-echo "*** Taking a 5-7 seconds to gather VM ID information ***"
-echo
+echo -n "Please Wait: Gathering information to verify the Virtual Machine ID (VM ID) ."
 # Get the VMID's currently used
 vmidnext=$(pvesh get /cluster/nextid)
+echo -n "."
 declare -a vmidsavail=$(pvesh get /cluster/resources | awk '{print $2}' | sed '/storage/d' | sed '/node/d' | sed '/id/d' | sed '/./,/^$/!d' | cut -d '/' -f 2 | sed '/^$/d')
-
+echo -n "."
 #echo ${vmidsavail[@]}
 
 for ((i=1;i<=99;i++));
@@ -178,32 +216,36 @@ do
 done
 
 USEDIDS=("${vmidsavail[@]}" "${systemids[@]}")
+echo -n "."
 declare -a all=( echo ${USEDIDS[@]} )
+echo "."
 
-function get_vmidnumber() {
-    echo "${1} New VM ID number: "
-    read number
+# =========================================================
+# Get VMID
+# =========================================================
+while true; do
+    ask-number number "Enter Virtual Machine ID (VM ID) number:"
     if [[ " ${all[*]} " != *" ${number} "* ]]
     then
         VMID=${number:-$vmidnext}
+        break
     else
-        get_vmidnumber 'Enter a different number because either you are using it or reserved by the sysem'
+        echo -e "\e[1;31mEnter a different VM ID number because either $number is already in use or reserved by the system\e[0m"
     fi
-}
-echo "Enter desired VM ID number or press enter to accept default of $vmidnext: "
-get_vmidnumber ''
-echo "The VM number will be $VMID"
+done
+echo ""
 
 
 # =========================================================
 # Get USER and PASSWORD
 # =========================================================
-ask-verify USER "Enter desired VM username:"
-ask-verify PASSWORD "Please enter password for the user:"
+ask-verify USER "Enter username to log into new VM:"
+ask-verify-noecho PASSWORD "Please enter password for the user $USER:"
 # really just hashing the password so its not in plain text in the usercloud.yaml
 # that is being created during the process
 # really should do keys for most secure
 kindofsecure=$(openssl passwd -1 -salt SaltSalt $PASSWORD)
+echo ""
 
 
 # =========================================================
@@ -227,6 +269,7 @@ fi
 done
 
 echo "The storage you selected for the VM is $vmstorage"
+echo ""
 
 
 # =========================================================
@@ -258,6 +301,7 @@ fi
 done
 
 echo "The cloud image will be downloaded to " $isostorage " or look there if already downloaded"
+echo ""
 
 
 # =========================================================================================
@@ -319,6 +363,7 @@ done
 
 echo "The snippet storage path of the user.yaml file will be" $snippetstorage
 echo "The storage for snippets being used is" $snipstorage
+echo ""
 
 
 # ============================================================
@@ -348,35 +393,39 @@ fi
 done
 
 echo "Your network bridge will be on " $vmbrused
+echo ""
 
 
 # =========================================================
 # Get VLAN 
 # =========================================================
-ask-yes-no VLANYESORNO "Do you need to enter a VLAN number? [Y/n]:"
+ask-yes-no VLANYESORNO "Do you need to enter a VLAN number?"
 if [ "$VLANYESORNO" = "y" ]; then
     ask-number VLAN "Enter desired VLAN number for the VM:"
 fi
+echo ""
 
 
 # =========================================================
 # Get DHCPYESORNO, IPADDRESS and GATEWAY
 # =========================================================
 ask-yes-no DHCPYESORNO "Enter Yes/Y to use DHCP for IP or Enter No/N to set a static IP address:"
-if [ "$DHCPYESORNO" = "y" ]; then
+if [ "$DHCPYESORNO" = "n" ]; then
     ask-verify IPADDRESS "Enter IP address to use (format example 192.168.1.50/24):"
     ask-verify GATEWAY "Enter gateway IP address to use (format example 192.168.1.1):"
 fi
+echo ""
 
 
 # =====================================================================================================================================================
 # Get RESIZEDISK and ADDDISKSIZE -  This next section is asking if you need to resize the root disk so its jsut not the base size from the cloud image
 # =====================================================================================================================================================
 ADDDISKSIZE=""
-ask-yes-no RESIZEDISK "Would you like to resize the base cloud image disk (Enter Y/N?):"
+ask-yes-no RESIZEDISK "Would you like to resize the base cloud image disk"
 if [ "$RESIZEDISK" = "y" ]; then
     ask-number ADDDISKSIZE "Enter size in Gb's (Example 2 for adding 2GB to the resize):"
 fi
+echo ""
 
 
 # =================================================================================
@@ -387,11 +436,12 @@ fi
 CORES="2"
 MEMORY="2048"
 echo "The default CPU cores is set to $CORES and default memory (ram) is set to $MEMORY"
-ask-yes-no corememyesno "Would you like to change the cores or memory [Y/n]:"
+ask-yes-no corememyesno "Would you like to change the cores or memory?"
 if [ "$corememyesno" = "y" ]; then
     ask-number CORES "Enter number of cores for VM $VMID:"
     ask-number MEMORY "Enter how much memory for the VM $VMID (example 2048 is 2Gb of memory):"
 fi
+echo ""
 
 
 # =========================================================================
@@ -399,7 +449,7 @@ fi
 # This block is see if they want to add a key to the VM
 # and then it checks the path to it and checks to make sure it exists
 # =========================================================================
-ask-yes-no sshyesno "Do you want to add a ssh key by entering the path to the key [Y/n]:"
+ask-yes-no sshyesno "Do you want to add a ssh key by entering the path to the key?"
 if [ "$sshyesno" = "y" ]; then
     while true
     do
@@ -413,6 +463,7 @@ if [ "$sshyesno" = "y" ]; then
         fi
     done
 fi
+echo ""
 
 
 # ==============================================================
@@ -425,6 +476,7 @@ ask-yes-no sshpassyesorno "Do you want ssh password authentication [Y/n]:"
 if [ "$sshpassyesorno" = "y" ]; then
     sshpassallow=True
 fi
+echo ""
 
 
 # ==================================================================
@@ -435,10 +487,11 @@ fi
 # qemu-guest-agent
 # ==================================================================
 QEMUGUESTAGENT=n
-ask-yes-no qemuyesno "Would you like to install qemu-gust-agent on first run [Y/n]:"
+ask-yes-no qemuyesno "Would you like to install qemu-gust-agent on first run?"
 if [ "$qemuyesno" = "y" ]; then
     QEMUGUESTAGENT=y
 fi
+echo ""
 
 
 # ================================
@@ -446,10 +499,12 @@ fi
 # Autostart at boot question
 # ================================
 AUTOSTART=no
-ask-yes-no AUTOSTARTS "Would you like to install qemu-gust-agent on first run [Y/n]:"
+ask-yes-no AUTOSTARTS "Do you want the VM to autostart after you create it here?"
 if [ "$AUTOSTARTS" = "y" ]; then
     AUTOSTART=yes
 fi
+echo ""
+
 
 # =========================================================================
 # Get NODESYESNO, migratenode
@@ -500,12 +555,15 @@ then
         fi
     done
 fi
+echo ""
+
 
 # ==========================
 # Get PROTECTVM
 # VM Protection: $PROTECTVM
 # ==========================
-ask-yes-no PROTECTVM "Do you want VM protection enabled [Y/n]:"
+ask-yes-no PROTECTVM "Do you want VM protection enabled?"
+echo ""
 
 
 # ==============
@@ -552,7 +610,8 @@ do
   esac
 done
 echo "You have selected Cloud Image $osopt"
-echo
+echo ""
+
 
 # setting the Cloud Image for later for qm info
 if [ "$osopt" == "Ubuntu Groovy 20.10 Cloud Image" ];
@@ -617,7 +676,40 @@ then
     echo " - systemctl restart qemu-guest-agent" >> $snippetstorage$VMID.yaml
 fi
 
+
+display-var()
+{
+    echo -e "$1\t\t${!1}"
+}
 echo "Stopping before creating VM to validate all inputs"
+echo ""
+echo ""
+echo "Here are the required variables and Values"
+
+display-var VMID
+display-var NEWHOSTNAME
+display-var CORES
+display-var MEMORY
+display-var VLANYESORNO
+display-var VMID
+display-var vmbrused
+display-var VLAN
+display-var vmstorage
+display-var VMID
+display-var cloudos
+display-var vmstorage
+display-var DHCPYESORNO
+display-var IPADDRESS
+display-var GATEWAY
+display-var RESIZEDISK
+display-var ADDDISKSIZE
+display-var PROTECTVM
+display-var snipstorage
+display-var TEMPLATEVM
+display-var AUTOSTART
+display-var NODESYESNO
+display-var migratenode
+
 exit
 #=========================================================================================================================================
 
