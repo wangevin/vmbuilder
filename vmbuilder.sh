@@ -190,11 +190,11 @@ add_to_image()
 # =========================================================
 while true; do
     ask NEWHOSTNAME "Enter desired hostname for the Virutal Machine:"
-    if [[ ! $NEWHOSTNAME == *['!'@#\$%^\&*()\_+\']* ]];then
-      break;
-   else
-      echo -e "\e[1;31mContains a character not allowed for a hostname, please try again\e[0m"
-   fi
+    result=`echo $NEWHOSTNAME | grep -P '(?=^.{1,254}$)(^(?>(?!\d+\.)[a-zA-Z0-9_\-]{1,63}\.?)+(?:[a-zA-Z]{2,})$)'`
+    if [[ -z "$result" ]]
+    then
+        echo -e "\e[1;31mContains a character not allowed for a hostname (FQDN), please try again\e[0m"
+    fi
 done
 echo ""
 
@@ -715,11 +715,11 @@ display-var migratenode
 
 echo ""
 echo ""
-echo "Building the VM"
+echo "Building the VM ..."
 
 
 # create a new VM
-qm create $VMID --name $NEWHOSTNAME --cores $CORES --onboot 1 --memory $MEMORY --agent 1,fstrim_cloned_disks=1
+qm create $VMID --name "$NEWHOSTNAME" --cores $CORES --onboot 1 --memory $MEMORY --agent 1,fstrim_cloned_disks=1
 
 if [[ $VLANYESORNO =~ ^[Yy]$ || $VLANYESORNO =~ ^[yY][eE][sS] ]]
 then
