@@ -190,7 +190,7 @@ add_to_image()
 # =========================================================
 while true; do
     ask NEWHOSTNAME "Enter desired hostname for the Virutal Machine:"
-    result=`echo $NEWHOSTNAME | grep -P '[^a-zA-Z_0-9_-]'`
+    result=`echo $NEWHOSTNAME | grep -P '[^a-zA-Z_0-9-]'`
     if [ ! -z "$result" ];
     then
         echo -e "\e[1;31mContains a character not allowed for a hostname, please try again\e[0m"
