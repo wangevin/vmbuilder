@@ -186,10 +186,11 @@ add_to_image()
 
 
 # =========================================================
-# Get NEWHOSTNAME
+# Get NEWHOSTNAME, quoted so no errors when using
 # =========================================================
 #while true; do
-    ask NEWHOSTNAME "Enter desired hostname for the Virutal Machine:"
+    ask host_description "Enter desired hostname for the Virutal Machine:"
+    NEWHOSTNAME="'$host_description'"
 #    result=`echo $NEWHOSTNAME | grep -P '(?=^.{1,254}$)(^(?>(?!\d+\.)[a-zA-Z0-9_\-]{1,63}\.?)+(?:[a-zA-Z]{2,})$)'`
 #    result=`echo $NEWHOSTNAME | grep -P '(?=^.{4,253}$)(^(?:[a-zA-Z0-9](?:(?:[a-zA-Z0-9\-]){0,61}[a-zA-Z0-9])?\.)+([a-zA-Z]{2,}|xn--[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])$)'`
 #    if [ -z "$result" ]
@@ -723,7 +724,9 @@ echo "Building the VM ..."
 
 check_exit_status()
 {
-    if ![ $? -eq 0 ]; then
+    if [ $? -ne 0 ]; then
+        echo -e "\e[1;31mPrevious command failed with error code: $?\e[0m"
+        exit
     fi
 }
 
