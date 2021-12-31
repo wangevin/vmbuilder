@@ -189,14 +189,11 @@ add_to_image()
 # Get NEWHOSTNAME, quoted so no errors when using
 # =========================================================
 while true; do
-    ask host_description "Enter desired hostname for the Virutal Machine:"
-    NEWHOSTNAME="'$host_description'"
-    result=`echo $NEWHOSTNAME | grep -P ' [^a-zA-Z_0-9]'`
-#    result=`echo $NEWHOSTNAME | grep -P '(?=^.{1,254}$)(^(?>(?!\d+\.)[a-zA-Z0-9_\-]{1,63}\.?)+(?:[a-zA-Z]{2,})$)'`
-#    result=`echo $NEWHOSTNAME | grep -P '(?=^.{4,253}$)(^(?:[a-zA-Z0-9](?:(?:[a-zA-Z0-9\-]){0,61}[a-zA-Z0-9])?\.)+([a-zA-Z]{2,}|xn--[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])$)'`
-    if [ -z "$result" ]
+    ask NEWHOSTNAME "Enter desired hostname for the Virutal Machine:"
+    result=`echo $NEWHOSTNAME | grep -P '[^a-zA-Z_0-9_-]'`
+    if [ ! -z "$result" ];
     then
-        echo -e "\e[1;31mContains a character not allowed for a hostname (FQDN), please try again\e[0m"
+        echo -e "\e[1;31mContains a character not allowed for a hostname, please try again\e[0m"
     else
         break
    fi
