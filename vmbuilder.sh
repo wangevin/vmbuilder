@@ -682,7 +682,7 @@ fi
 
 display-var()
 {
-    echo -e "$1\t\t${!1}"
+    echo -e "$1\t${!1}"
 }
 echo "Stopping before creating VM to validate all inputs"
 echo ""
@@ -719,12 +719,15 @@ echo "Building the VM ..."
 
 
 # create a new VM
+echo "qm create $VMID --name "$NEWHOSTNAME" --cores $CORES --onboot 1 --memory $MEMORY --agent 1,fstrim_cloned_disks=1"
 qm create $VMID --name "$NEWHOSTNAME" --cores $CORES --onboot 1 --memory $MEMORY --agent 1,fstrim_cloned_disks=1
 
 if [[ $VLANYESORNO =~ ^[Yy]$ || $VLANYESORNO =~ ^[yY][eE][sS] ]]
 then
+    echo "qm set $VMID --net0 virtio,bridge=$vmbrused,tag=$VLAN"
     qm set $VMID --net0 virtio,bridge=$vmbrused,tag=$VLAN
 else
+    echo "qm set $VMID --net0 virtio,bridge=$vmbrused"
     qm set $VMID --net0 virtio,bridge=$vmbrused
 fi
 
@@ -732,73 +735,70 @@ fi
 
 if [[ $vmstorage == "local" ]]
 then
-   qm importdisk $VMID $cloudos $vmstorage -format qcow2
+    echo "qm importdisk $VMID $cloudos $vmstorage -format qcow2"
+    qm importdisk $VMID $cloudos $vmstorage -format qcow2
 else
-   qm importdisk $VMID $cloudos $vmstorage
+    echo "qm importdisk $VMID $cloudos $vmstorage"
+    qm importdisk $VMID $cloudos $vmstorage
 fi
 
 if [[ $vmstorage == "local" ]]
 then
-   qm set $VMID --scsihw virtio-scsi-pci --scsi0 /var/lib/vz/images/$VMID/vm-$VMID-disk-0.qcow2,discard=on
+    echo "qm set $VMID --scsihw virtio-scsi-pci --scsi0 /var/lib/vz/images/$VMID/vm-$VMID-disk-0.qcow2,discard=on"
+    qm set $VMID --scsihw virtio-scsi-pci --scsi0 /var/lib/vz/images/$VMID/vm-$VMID-disk-0.qcow2,discard=on
 else
-   qm set $VMID --scsihw virtio-scsi-pci --scsi0 $vmstorage:vm-$VMID-disk-0,discard=on
+    echo "qm set $VMID --scsihw virtio-scsi-pci --scsi0 $vmstorage:vm-$VMID-disk-0,discard=on"
+    qm set $VMID --scsihw virtio-scsi-pci --scsi0 $vmstorage:vm-$VMID-disk-0,discard=on
 fi
 
 # cd drive for cloudinit info
+echo "qm set $VMID --ide2 $vmstorage:cloudinit"
 qm set $VMID --ide2 $vmstorage:cloudinit
 
 # make it boot hard drive only
+echo "qm set $VMID --boot c --bootdisk scsi0"
 qm set $VMID --boot c --bootdisk scsi0
-
+echo "qm set $VMID --serial0 socket --vga serial0"
 qm set $VMID --serial0 socket --vga serial0
 
 #Here we are going to set the network stuff from above
 if [[ $DHCPYESORNO =~ ^[Yy]$ || $DHCPYESORNO =~ ^[yY][eE][sS] ]]
 then
+    echo "qm set $VMID --ipconfig0 ip=dhc"
     qm set $VMID --ipconfig0 ip=dhcp
 else
+    echo "qm set $VMID --ipconfig0 ip=$IPADDRESS,gw=$GATEWAY"
     qm set $VMID --ipconfig0 ip=$IPADDRESS,gw=$GATEWAY
 fi
 
 # Addding to the default disk size if selected from above
 if [[ $RESIZEDISK =~ ^[Yy]$ || $RESIZEDISK =~ ^[yY][eE][sS] ]]
 then
+    echo "qm resize $VMID scsi0 +"$ADDDISKSIZE"G"
     qm resize $VMID scsi0 +"$ADDDISKSIZE"G
 fi
 
 if [[ "$PROTECTVM" =~ ^[Yy]$ || "$PROTECTVM" =~ ^[yY][eE][sS] ]]
 then
+    echo "qm set "$VMID" --protection 1"
     qm set "$VMID" --protection 1
 else
+    echo "qm set "$VMID" --protection 0"
     qm set "$VMID" --protection 0
 fi
 
 # Disabling tablet mode, usually is enabled but don't need it
+echo "qm set $VMID --tablet 0"
 qm set $VMID --tablet 0
 
 # Setting the cloud-init user information
+echo "qm set $VMID --cicustom 'user=$snipstorage:snippets/$VMID.yaml'"
 qm set $VMID --cicustom "user=$snipstorage:snippets/$VMID.yaml"
 
 echo
-while true
-do
- read -r -p "Do you want to turn this into a TEMPLATE VM [Y/n]: " TEMPLATEVM
-
- case "$TEMPLATEVM" in
-     [yY][eE][sS]|[yY])
- break
- ;;
-     [nN][oO]|[nN])
- break
-        ;;
-     *)
- echo "INVALID INPUT, PLEASE ENTER [Y/n]"
- ;;
- esac
-done
-
-if [[ "$TEMPLATEVM" =~ ^[Yy]$ || "$TEMPLATEVM" =~ ^[yY][eE][sS] ]]
-then
+ask-yes-no TEMPLATEVM "Do you want to turn this into a TEMPLATE VM?"
+if [ "$TEMPLATEVM" = "y" ]; then
+    echo "qm template "$VMID""
     qm template "$VMID"
     echo "You can now use this as a template"
     exit 0
@@ -807,11 +807,13 @@ fi
 ## Start the VM after Creation!!!!
 if [[ $AUTOSTART =~ ^[Yy]$ || $AUTOSTART =~ ^[yY][eE][sS] ]]
 then
+    echo "qm start $VMID"
     qm start $VMID
 fi
 
 # Migrating VM to the correct node if selected
 if [[ $NODESYESNO =~ ^[Yy]$ || $NODESYESNO =~ ^[yY][eE][sS] ]]
 then
+    echo "qm migrate $VMID $migratenode --online"
     qm migrate $VMID $migratenode --online
 fi
