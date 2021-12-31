@@ -724,16 +724,17 @@ echo "Building the VM ..."
 
 check_exit_status()
 {
-    if [ $? -ne 0 ]; then
-        echo -e "\e[1;31mPrevious command failed with error code: $?\e[0m"
+    EXIT_STATUS=$?
+    if [ $EXIT_STATUS -ne 0 ]; then
+        echo -e "\e[1;31mPrevious command failed with error code: $EXIT_STATUS\e[0m"
         exit
     fi
 }
 
 
 # create a new VM
-echo "qm create $VMID --name "'$NEWHOSTNAME'" --cores $CORES --onboot 1 --memory $MEMORY --agent 1,fstrim_cloned_disks=1"
-qm create $VMID --name "'$NEWHOSTNAME'" --cores $CORES --onboot 1 --memory $MEMORY --agent 1,fstrim_cloned_disks=1
+echo "qm create $VMID --name $NEWHOSTNAME --cores $CORES --onboot 1 --memory $MEMORY --agent 1,fstrim_cloned_disks=1"
+qm create $VMID --name $NEWHOSTNAME --cores $CORES --onboot 1 --memory $MEMORY --agent 1,fstrim_cloned_disks=1
 check_exit_status
 
 if [[ $VLANYESORNO =~ ^[Yy]$ || $VLANYESORNO =~ ^[yY][eE][sS] ]]
