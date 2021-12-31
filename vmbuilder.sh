@@ -731,13 +731,16 @@ check_exit_status()
 # create a new VM
 echo "qm create $VMID --name "'$NEWHOSTNAME'" --cores $CORES --onboot 1 --memory $MEMORY --agent 1,fstrim_cloned_disks=1"
 qm create $VMID --name "'$NEWHOSTNAME'" --cores $CORES --onboot 1 --memory $MEMORY --agent 1,fstrim_cloned_disks=1
+check_exit_status
 
 if [[ $VLANYESORNO =~ ^[Yy]$ || $VLANYESORNO =~ ^[yY][eE][sS] ]]
 then
     echo "qm set $VMID --net0 virtio,bridge=$vmbrused,tag=$VLAN"
     qm set $VMID --net0 virtio,bridge=$vmbrused,tag=$VLAN
+    check_exit_status
 else
     qm set $VMID --net0 virtio,bridge=$vmbrused
+    check_exit_status
 fi
 
 # import the downloaded disk to local-lvm storage
@@ -746,38 +749,46 @@ if [[ $vmstorage == "local" ]]
 then
     echo "qm importdisk $VMID $cloudos $vmstorage -format qcow2"
     qm importdisk $VMID $cloudos $vmstorage -format qcow2
+    check_exit_status
 else
     echo "qm importdisk $VMID $cloudos $vmstorage"
     qm importdisk $VMID $cloudos $vmstorage
+    check_exit_status
 fi
 
 if [[ $vmstorage == "local" ]]
 then
     echo "qm set $VMID --scsihw virtio-scsi-pci --scsi0 /var/lib/vz/images/$VMID/vm-$VMID-disk-0.qcow2,discard=on"
     qm set $VMID --scsihw virtio-scsi-pci --scsi0 /var/lib/vz/images/$VMID/vm-$VMID-disk-0.qcow2,discard=on
+    check_exit_status
 else
     echo "qm set $VMID --scsihw virtio-scsi-pci --scsi0 $vmstorage:vm-$VMID-disk-0,discard=on"
     qm set $VMID --scsihw virtio-scsi-pci --scsi0 $vmstorage:vm-$VMID-disk-0,discard=on
+    check_exit_status
 fi
 
 # cd drive for cloudinit info
 echo "qm set $VMID --ide2 $vmstorage:cloudinit"
 qm set $VMID --ide2 $vmstorage:cloudinit
+check_exit_status
 
 # make it boot hard drive only
 echo "qm set $VMID --boot c --bootdisk scsi0"
 qm set $VMID --boot c --bootdisk scsi0
 echo "qm set $VMID --serial0 socket --vga serial0"
 qm set $VMID --serial0 socket --vga serial0
+check_exit_status
 
 #Here we are going to set the network stuff from above
 if [[ $DHCPYESORNO =~ ^[Yy]$ || $DHCPYESORNO =~ ^[yY][eE][sS] ]]
 then
     echo "qm set $VMID --ipconfig0 ip=dhc"
     qm set $VMID --ipconfig0 ip=dhcp
+    check_exit_status
 else
     echo "qm set $VMID --ipconfig0 ip=$IPADDRESS,gw=$GATEWAY"
     qm set $VMID --ipconfig0 ip=$IPADDRESS,gw=$GATEWAY
+    check_exit_status
 fi
 
 # Addding to the default disk size if selected from above
@@ -785,30 +796,36 @@ if [[ $RESIZEDISK =~ ^[Yy]$ || $RESIZEDISK =~ ^[yY][eE][sS] ]]
 then
     echo "qm resize $VMID scsi0 +"$ADDDISKSIZE"G"
     qm resize $VMID scsi0 +"$ADDDISKSIZE"G
+    check_exit_status
 fi
 
 if [[ "$PROTECTVM" =~ ^[Yy]$ || "$PROTECTVM" =~ ^[yY][eE][sS] ]]
 then
     echo "qm set "$VMID" --protection 1"
     qm set "$VMID" --protection 1
+    check_exit_status
 else
     echo "qm set "$VMID" --protection 0"
     qm set "$VMID" --protection 0
+    check_exit_status
 fi
 
 # Disabling tablet mode, usually is enabled but don't need it
 echo "qm set $VMID --tablet 0"
 qm set $VMID --tablet 0
+check_exit_status
 
 # Setting the cloud-init user information
 echo "qm set $VMID --cicustom 'user=$snipstorage:snippets/$VMID.yaml'"
 qm set $VMID --cicustom "user=$snipstorage:snippets/$VMID.yaml"
+check_exit_status
 
 echo
 ask-yes-no TEMPLATEVM "Do you want to turn this into a TEMPLATE VM?"
 if [ "$TEMPLATEVM" = "y" ]; then
     echo "qm template "$VMID""
     qm template "$VMID"
+    check_exit_status
     echo "You can now use this as a template"
     exit 0
 fi
@@ -818,6 +835,7 @@ if [[ $AUTOSTART =~ ^[Yy]$ || $AUTOSTART =~ ^[yY][eE][sS] ]]
 then
     echo "qm start $VMID"
     qm start $VMID
+    check_exit_status
 fi
 
 # Migrating VM to the correct node if selected
@@ -825,4 +843,5 @@ if [[ $NODESYESNO =~ ^[Yy]$ || $NODESYESNO =~ ^[yY][eE][sS] ]]
 then
     echo "qm migrate $VMID $migratenode --online"
     qm migrate $VMID $migratenode --online
+    check_exit_status
 fi
