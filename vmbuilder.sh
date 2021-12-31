@@ -156,12 +156,12 @@ install()
 	# Test if no data passed
 	if [ -z $1 ];
 	then
-		echo_red "No Package specified"
+		echo -e "\e[1;31mNo Package specified\e[0m"
 	else
 		dpkg -s $1 &> /dev/null
 		if [ $? -eq 0 ]; 
 		then
-			echo "Package $1 already installed!"
+			echo -e "\e[1;31mPackage $1 already installed!\e[0m"
 		else
 			sudo apt install $1 -y
 		fi
@@ -173,10 +173,10 @@ add_to_image()
 	echo "Add Package $2 to image $1 ..."
 	if [ -z $1 ];
 	then
-		echo_red "No Package specified"
+		echo -e "\e[1;31mNo Package specified\e[0m"
 	elif [ -z $2 ];
 	then
-		echo_red "No Package specified"
+		echo -e "\e[1;31mNo Package specified\e[0m"
 	else
 		# Example
 		# sudo virt-customize -a focal-server-cloudimg-amd64.img --install sudo	
@@ -267,7 +267,7 @@ then
         vmstorage=$option
         break;
 else
-        echo_red "Incorrect Input: Select a number 1-$total_num_storage"
+        echo -e "\e[1;31mIncorrect Input: Select a number 1-$total_num_storage\e[0m"
 fi
 done
 
@@ -299,7 +299,7 @@ then
         isostorage=$option
         break;
 else
-        echo_red "Incorrect Input: Select a number 1-$total_num_storage_paths"
+        echo -e "\e[1;31mIncorrect Input: Select a number 1-$total_num_storage_paths\e[0m"
 fi
 done
 
@@ -336,7 +336,7 @@ then
         snippetstorage=$option
         break;
 else
-        echo_red "Incorrect Input: Select a number 1-$total_num_snippet_paths"
+        echo -e "\e[1;31mIncorrect Input: Select a number 1-$total_num_snippet_paths\e[0m"
 fi
 done
 
@@ -391,7 +391,7 @@ then
         vmbrused=$option
         break;
 else
-        echo -e "$TEXT_RED Incorrect Input: Select a number 1-$total_num_vmbrs $TEXT_RESET"
+        echo -e "\e[1;31mIncorrect Input: Select a number 1-$total_num_vmbrs\e[0m"
 fi
 done
 
@@ -462,7 +462,7 @@ if [ "$sshyesno" = "y" ]; then
             SSHAUTHKEYS=$(cat "$path_to_ssh_key")
             break
         else
-            echo -e "$TEXT_RED Does not exist, try again please. $TEXT_RESET"
+            echo -e "\e[1;31mDoes not exist, try again please.\e[0m"
         fi
     done
 fi
@@ -548,7 +548,7 @@ then
                         migratenode=$option
                         break;
                     else
-                        echo_red "Incorrect Input: Select a number 1-$total_num_nodes"
+                        echo -e "\e[1;31mIncorrect Input: Select a number 1-$total_num_nodes\e[0m"
                     fi
                 done
             done
@@ -721,9 +721,16 @@ echo ""
 echo "Building the VM ..."
 
 
+check_exit_status()
+{
+    if ![ $? -eq 0 ]; then
+    fi
+}
+
+
 # create a new VM
-echo "qm create $VMID --name "$NEWHOSTNAME" --cores $CORES --onboot 1 --memory $MEMORY --agent 1,fstrim_cloned_disks=1"
-qm create $VMID --name "$NEWHOSTNAME" --cores $CORES --onboot 1 --memory $MEMORY --agent 1,fstrim_cloned_disks=1
+echo "qm create $VMID --name "'$NEWHOSTNAME'" --cores $CORES --onboot 1 --memory $MEMORY --agent 1,fstrim_cloned_disks=1"
+qm create $VMID --name "'$NEWHOSTNAME'" --cores $CORES --onboot 1 --memory $MEMORY --agent 1,fstrim_cloned_disks=1
 
 if [[ $VLANYESORNO =~ ^[Yy]$ || $VLANYESORNO =~ ^[yY][eE][sS] ]]
 then
