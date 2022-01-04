@@ -1,6 +1,11 @@
 # README
 
 **```Update:```** 2021-12-30 Modified to use common functions
+
+<p>&nbsp;</p>
+
+**NOTE:** Please use [https://github.com/francismunch/vmbuilder](https://github.com/francismunch/vmbuilder)'s excellent script
+This is forked from it and modified as required.  Mostly as a personal self-tutorial on writting BASH scripts.  Which clearly needs more work. 
 <p>&nbsp;</p>
 
 # **HOW TO USE**
@@ -17,9 +22,7 @@ SSH to Proxmox as root, then:
 
 
 # Proxmox Virtual Machine Builder with Cloud Images
-**NOTE:** This is forked from [https://github.com/francismunch/vmbuilder](https://github.com/francismunch/vmbuilder) excellent script, modified as required
 
-<p>&nbsp;</p>
 You can have a virtual machine created and booted with the information you set within two minutes. Auto downloads the cloud image if you need it and once all the information is set it auto starts it for you.
 
 This script can be used for beginners that don't know much about Proxmox yet or it can be used by advanced users to get a bunch of different VM's running in no time.  (Pro tip give it your ansible key when asked for keys and then run your playbook after creation)
